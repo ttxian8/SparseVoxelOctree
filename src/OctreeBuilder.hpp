@@ -3,6 +3,7 @@
 
 #include "Counter.hpp"
 #include "Voxelizer.hpp"
+#include "VoxDataAdapter.hpp"
 
 #include "myvk/Buffer.hpp"
 #include "myvk/ComputePipeline.hpp"
@@ -13,6 +14,7 @@
 class OctreeBuilder {
 private:
 	std::shared_ptr<Voxelizer> m_voxelizer_ptr;
+	std::shared_ptr<VoxDataAdapter> m_vox_adapter_ptr;
 
 	std::shared_ptr<myvk::PipelineLayout> m_pipeline_layout;
 	std::shared_ptr<myvk::ComputePipeline> m_tag_node_pipeline, m_init_node_pipeline, m_alloc_node_pipeline,
@@ -31,12 +33,27 @@ private:
 	void create_buffers(const std::shared_ptr<myvk::Device> &device);
 	void create_descriptors(const std::shared_ptr<myvk::Device> &device);
 	void create_pipeline(const std::shared_ptr<myvk::Device> &device);
+	
+	// VoxDataAdapter支持方法
+	void create_buffers_from_vox(const std::shared_ptr<myvk::Device> &device);
+	void create_descriptors_from_vox(const std::shared_ptr<myvk::Device> &device);
+	void create_pipeline_from_vox(const std::shared_ptr<myvk::Device> &device);
 
 public:
 	static std::shared_ptr<OctreeBuilder> Create(const std::shared_ptr<Voxelizer> &voxelizer,
-	                                             const std::shared_ptr<myvk::CommandPool> &command_pool);
+	                                              const std::shared_ptr<myvk::CommandPool> &command_pool);
+	
+	static std::shared_ptr<OctreeBuilder> Create(const std::shared_ptr<VoxDataAdapter> &vox_adapter,
+	                                              const std::shared_ptr<myvk::CommandPool> &command_pool);
 	const std::shared_ptr<Voxelizer> &GetVoxelizerPtr() const { return m_voxelizer_ptr; }
-	uint32_t GetLevel() const { return m_voxelizer_ptr->GetLevel(); }
+	uint32_t GetLevel() const {
+		if (m_voxelizer_ptr) {
+			return m_voxelizer_ptr->GetLevel();
+		} else if (m_vox_adapter_ptr) {
+			return m_vox_adapter_ptr->GetLevel();
+		}
+		return 0;
+	}
 
 	void CmdBuild(const std::shared_ptr<myvk::CommandBuffer> &command_buffer) const;
 	VkDeviceSize GetOctreeRange(const std::shared_ptr<myvk::CommandPool> &command_pool) const;

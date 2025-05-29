@@ -24,9 +24,9 @@ void LoaderLoadSceneModal(const std::shared_ptr<LoaderThread> &loader_thread) {
 		static char name_buf[kFilenameBufSize];
 		static int octree_leve = 10;
 
-		constexpr const char *kFilter[] = {"*.obj"};
+		constexpr const char *kFilter[] = {"*.obj", "*.vox"};
 
-		ImGui::FileOpen("OBJ Filename", "...", name_buf, kFilenameBufSize, "OBJ Filename", 1, kFilter);
+		ImGui::FileOpen("Scene Filename", "...", name_buf, kFilenameBufSize, "Scene Filename", 2, kFilter);
 		ImGui::DragInt("Octree Level", &octree_leve, 1, kOctreeLevelMin, kOctreeLevelMax);
 
 		float button_width = (ImGui::GetWindowContentRegionWidth() - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
