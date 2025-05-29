@@ -8,6 +8,7 @@ std::shared_ptr<LoaderThread> LoaderThread::Create(const std::shared_ptr<Octree>
 	ret->m_octree_ptr = octree;
 	ret->m_loader_queue = loader_queue;
 	ret->m_main_queue = main_queue;
+	ret->m_notification = "Ready";  // 初始化notification避免空指针
 
 	return ret;
 }

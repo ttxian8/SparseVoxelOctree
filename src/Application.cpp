@@ -167,7 +167,12 @@ void Application::initialize_vulkan() {
 #ifdef NDEBUG
 	m_instance = myvk::Instance::CreateWithGlfwExtensions();
 #else
+	// 尝试先创建带验证层的实例，如果失败则回退到不带验证层
 	m_instance = myvk::Instance::CreateWithGlfwExtensions(true, debug_callback);
+	if (!m_instance) {
+		spdlog::warn("Failed to create instance with validation layers, trying without...");
+		m_instance = myvk::Instance::CreateWithGlfwExtensions();
+	}
 #endif
 	if (!m_instance) {
 		spdlog::error("Failed to create instance!");

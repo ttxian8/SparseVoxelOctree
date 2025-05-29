@@ -50,7 +50,8 @@ void LoaderLoadingModal(const std::shared_ptr<LoaderThread> &loader_thread) {
 	                               ImGuiWindowFlags_NoMove)) {
 		ImGui::Spinner("##spinner", 12, 6, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
 		ImGui::SameLine();
-		ImGui::TextUnformatted(loader_thread->GetNotification());
+		const char* notification = loader_thread->GetNotification();
+		ImGui::TextUnformatted(notification ? notification : "Loading...");
 
 		ImGui::EndPopup();
 	}
