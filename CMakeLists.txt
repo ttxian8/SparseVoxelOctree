@@ -80,6 +80,12 @@ add_executable(SparseVoxelOctree
 		src/UIOctreeTracer.hpp
 		src/UILighting.cpp
 		src/UILighting.hpp
+		src/VoxLoader.cpp
+		src/VoxLoader.hpp
+		src/Voxelizer.cpp
+		src/Voxelizer.hpp
+		src/VoxDataAdapter.cpp
+		src/VoxDataAdapter.hpp
 		)
 
 find_package(Threads REQUIRED)
