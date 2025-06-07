@@ -352,8 +352,12 @@ Application::~Application() {
 
 void Application::Load(const char *filename, uint32_t octree_level) {
 	m_octree_builder = nullptr;
-	m_octree_builder_ready = false; // 重置标志，下次 TryJoin 后可提取
-	m_loader_thread->Launch(filename, octree_level);
+	m_octree_builder_ready = false; // 重置标志
+	spdlog::info("Load() called, builder ready flag reset, launching loader thread...");
+	if (m_loader_thread)
+		m_loader_thread->Launch(filename, octree_level);
+	else
+		spdlog::warn("Load() called but m_loader_thread is null!");
 }
 
 void Application::Run() {
@@ -422,30 +426,37 @@ void Application::Run() {
 }
 
 void Application::ui_switch_state() {
-	if (m_path_tracer_thread->IsRunning()) {
+	if (m_path_tracer_thread && m_path_tracer_thread->IsRunning()) {
 		m_ui_state = UIStates::kPathTracing;
-	} else if (m_loader_thread->IsRunning()) {
+	} else if (m_loader_thread && m_loader_thread->IsRunning()) {
 		m_ui_state = UIStates::kLoading;
 
-		if (m_loader_thread->TryJoin() && !m_octree_builder_ready) {
+		bool just_joined = m_loader_thread->TryJoin();
+		if (just_joined && !m_octree_builder_ready) {
 			// 只在第一次TryJoin后提取builder
 			m_octree_builder = nullptr;
 			auto& future = m_loader_thread->GetFuture();
 			if (future.valid()) {
 				try {
-					m_octree_builder = future.get();
-					spdlog::info("m_octree_builder set from loader thread");
+					std::shared_ptr<OctreeBuilder> builder = future.get();
+					if (builder) {
+						m_octree_builder = builder;
+						spdlog::info("[ui_switch_state] m_octree_builder SET from loader thread!");
+					} else {
+						spdlog::warn("[ui_switch_state] OctreeBuilder from loader thread is null!");
+					}
 				} catch (const std::exception& e) {
-					spdlog::error("Failed to get OctreeBuilder from loader thread: {}", e.what());
+					spdlog::error("[ui_switch_state] Failed to get OctreeBuilder from loader thread: {}", e.what());
 				}
+			} else {
+				spdlog::warn("[ui_switch_state] LoaderThread future is not valid when trying to get OctreeBuilder!");
 			}
 			m_octree_builder_ready = true;
-			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
-		} else if (m_loader_thread->TryJoin()) {
-			// 已经提取过builder，不重复提取
-			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
+			m_ui_state = m_octree && m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
+		} else if (just_joined) {
+			m_ui_state = m_octree && m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
 		}
-	} else if (m_octree->Empty())
+	} else if (m_octree && m_octree->Empty())
 		m_ui_state = UIStates::kEmpty;
 	else {
 		m_ui_state = UIStates::kOctreeTracer;
