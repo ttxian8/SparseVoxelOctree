@@ -1,7 +1,9 @@
 #include "OctreeBuilder.hpp"
 #include "Config.hpp"
-
+#include <glm/glm.hpp>
 #include <spdlog/spdlog.h>
+#include <vector>
+#include <mutex>
 
 inline static constexpr uint32_t group_x_64(uint32_t x) { return (x >> 6u) + ((x & 0x3fu) ? 1u : 0u); }
 
@@ -373,22 +375,69 @@ void OctreeBuilder::CmdTransferOctreeOwnership(const std::shared_ptr<myvk::Comma
 // 这里只提供伪实现，你需针对自身体素数据结构优化！
 // 可用多线程或并行处理大范围操作
 void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
-	// 假设 m_voxelizer_ptr->GetVoxelResolution() 可获得体素边长
+	// 体素分辨率
 	if (!m_voxelizer_ptr) return;
 	uint32_t res = m_voxelizer_ptr->GetVoxelResolution();
+	auto voxel_buffer = m_voxelizer_ptr->GetVoxelFragmentList();
+	if (!voxel_buffer) return;
 
-	// 这里应访问体素数据，遍历并将距离center<radius的体素设为“移除”
-	// 伪码如下，具体实现需结合你的数据结构
-	/*
-	for (uint32_t x = 0; x < res; ++x)
-	for (uint32_t y = 0; y < res; ++y)
-	for (uint32_t z = 0; z < res; ++z) {
-		glm::vec3 voxel_pos = ... // 体素世界坐标
-		if (glm::distance(voxel_pos, center) < radius) {
-			// 标记/移除体素
+	// 假设每个体素片段记录为 uint32_t[2]，第一个为packed坐标，第二个为颜色或属性等（你可根据实际调整）
+	uint32_t voxel_count = m_voxelizer_ptr->GetVoxelFragmentCount();
+	if (voxel_count == 0) return;
+	
+	// 读取现有体素数据到CPU
+	std::vector<uint32_t> temp_fragments(voxel_count * 2);
+	voxel_buffer->DownloadData(temp_fragments.data(), 0, temp_fragments.size() * sizeof(uint32_t));
+
+	// 体素坐标解包函数
+	auto unpack_voxel_coord = [res](uint32_t packed) -> glm::ivec3 {
+		// 约定：x = (packed >>  0) & 0x3FF
+		//      y = (packed >> 10) & 0x3FF
+		//      z = (packed >> 20) & 0x3FF
+		return glm::ivec3(
+			int((packed >>  0) & 0x3FF),
+			int((packed >> 10) & 0x3FF),
+			int((packed >> 20) & 0x3FF)
+		);
+	};
+	auto voxel_to_world = [res](const glm::ivec3& v) -> glm::vec3 {
+		// 体素坐标转世界坐标，假设范围[0, res)
+		return glm::vec3(v) / float(res);
+	};
+
+	// 新建输出体素表
+	std::vector<uint32_t> new_fragments;
+	new_fragments.reserve(temp_fragments.size());
+
+	uint32_t removed = 0;
+	for (uint32_t i = 0; i < voxel_count; ++i) {
+		uint32_t packed = temp_fragments[i * 2];
+		glm::ivec3 vox = unpack_voxel_coord(packed);
+		glm::vec3 world_pos = voxel_to_world(vox);
+
+		if (glm::distance(world_pos, center) >= radius) {
+			// 保留
+			new_fragments.push_back(temp_fragments[i * 2]);
+			new_fragments.push_back(temp_fragments[i * 2 + 1]);
+		} else {
+			++removed;
 		}
 	}
-	*/
-	// 体素数据更新完成后，需重新build/octree update
-	// 可异步/延迟触发以优化性能
+
+	// 若有体素被移除，则更新缓冲区和计数
+	if (removed > 0) {
+		spdlog::info("Voxel destruction: removed {} voxels at ({},{},{}) radius {}", removed, center.x, center.y, center.z, radius);
+		// 上传新体素数据到GPU
+		voxel_buffer->UpdateData(new_fragments.data(), 0, new_fragments.size() * sizeof(uint32_t));
+		// 更新计数
+		m_voxelizer_ptr->m_voxel_fragment_count = uint32_t(new_fragments.size() / 2);
+
+		// 重新构建八叉树和相关结构
+		// 这里假设有命令池可用，你可能需要传递相关参数或异步处理
+		if (auto cmd_pool = m_voxelizer_ptr->m_scene_ptr->GetCommandPoolPtr()) {
+			this->Update(cmd_pool, shared_from_this());
+		}
+	} else {
+		spdlog::info("Voxel destruction: no voxels removed at ({},{},{})", center.x, center.y, center.z);
+	}
 }

@@ -59,7 +59,7 @@ void Camera::Control(GLFWwindow *window, float delta) {
 		if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 			m_position.y -= speed;
 
-		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)) {
+		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT)) {
 			glfwGetCursorPos(window, &cur_pos.x, &cur_pos.y);
 			float offset_x = float(cur_pos.x - m_last_mouse_pos.x) * m_sensitivity;
 			float offset_y = float(cur_pos.y - m_last_mouse_pos.y) * m_sensitivity;
