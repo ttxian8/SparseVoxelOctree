@@ -355,8 +355,40 @@ void Application::Run() {
 
 		glfwPollEvents();
 
-		if (m_ui_state == UIStates::kOctreeTracer)
+		// --- 新增：左键体素破坏逻辑 ---
+		if (m_ui_state == UIStates::kOctreeTracer) {
 			m_camera->Control(m_window, float(cur_time - lst_time));
+
+			// 检查左键（GLFW_MOUSE_BUTTON_LEFT）是否按下
+			if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+				// 获取鼠标位置（像素）
+				double xpos, ypos;
+				glfwGetCursorPos(m_window, &xpos, &ypos);
+				int win_w, win_h;
+				glfwGetWindowSize(m_window, &win_w, &win_h);
+
+				// 转归一化屏幕坐标
+				float sx = float(xpos) / float(win_w);
+				float sy = float(ypos) / float(win_h);
+
+				// 获取射线
+				glm::vec3 ray_dir = m_camera->ScreenRay(sx, sy);
+				glm::vec3 cam_pos = m_camera->m_position;
+
+				// 这里需有体素拾取/射线-体素相交算法，找到第一个被射中的体素位置（可优化为SVO加速）
+				// 伪代码如下（具体实现需结合SVO结构优化）：
+				glm::vec3 hit_voxel_world = cam_pos + ray_dir * 5.0f; // 这里5.0f应为场景深度的最大值，实际应遍历体素/八叉树
+
+				// 调用OctreeBuilder体素删除
+				if (m_octree_builder) {
+					float destroy_radius = 0.2f; // 破坏半径，按需调整
+					m_octree_builder->RemoveVoxelsRegion(hit_voxel_world, destroy_radius);
+
+					// 更新八叉树
+					// m_octree->Update(...); // 如有必要，带上builder等参数
+				}
+			}
+		}
 
 		ui_switch_state();
 

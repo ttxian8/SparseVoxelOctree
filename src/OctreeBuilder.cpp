@@ -368,3 +368,27 @@ void OctreeBuilder::CmdTransferOctreeOwnership(const std::shared_ptr<myvk::Comma
 	command_buffer->CmdPipelineBarrier(
 	    src_stage, dst_stage, {}, {m_octree_buffer->GetMemoryBarrier(0, 0, src_queue_family, dst_queue_family)}, {});
 }
+
+// 新增：体素区域销毁（球形，实际实现需遍历voxel数据）
+// 这里只提供伪实现，你需针对自身体素数据结构优化！
+// 可用多线程或并行处理大范围操作
+void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
+	// 假设 m_voxelizer_ptr->GetVoxelResolution() 可获得体素边长
+	if (!m_voxelizer_ptr) return;
+	uint32_t res = m_voxelizer_ptr->GetVoxelResolution();
+
+	// 这里应访问体素数据，遍历并将距离center<radius的体素设为“移除”
+	// 伪码如下，具体实现需结合你的数据结构
+	/*
+	for (uint32_t x = 0; x < res; ++x)
+	for (uint32_t y = 0; y < res; ++y)
+	for (uint32_t z = 0; z < res; ++z) {
+		glm::vec3 voxel_pos = ... // 体素世界坐标
+		if (glm::distance(voxel_pos, center) < radius) {
+			// 标记/移除体素
+		}
+	}
+	*/
+	// 体素数据更新完成后，需重新build/octree update
+	// 可异步/延迟触发以优化性能
+}

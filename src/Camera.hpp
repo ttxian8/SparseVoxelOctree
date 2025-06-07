@@ -17,6 +17,10 @@ public:
 	float m_yaw{0.0f}, m_pitch{0.0f}, m_fov{PIF / 3.0f}, m_aspect_ratio{float(kDefaultWidth) / float(kDefaultHeight)};
 	float m_sensitivity{0.005f}, m_speed{0.0625f};
 
+	// 新增：从屏幕坐标获取世界空间射线
+	// screen_x, screen_y ∈ [0, 1]，分别对应窗口左上角到右下角
+	glm::vec3 ScreenRay(float screen_x, float screen_y) const;
+
 private:
 	glm::dvec2 m_last_mouse_pos{0.0, 0.0};
 

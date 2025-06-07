@@ -97,3 +97,35 @@ Camera::UniformData Camera::fetch_uniform_data() const {
 void Camera::UpdateFrameUniformBuffer(uint32_t current_frame) const {
 	m_uniform_buffers[current_frame]->UpdateData(fetch_uniform_data());
 }
+
+// 新增：从屏幕坐标（归一化）获得射线方向
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+glm::vec3 Camera::ScreenRay(float screen_x, float screen_y) const {
+	// 投影矩阵
+	glm::mat4 projection = glm::perspective(m_fov, m_aspect_ratio, 0.01f, 1000.0f);
+	// 视图矩阵
+	glm::vec3 front{
+	    cos(m_pitch) * cos(m_yaw),
+	    sin(m_pitch),
+	    cos(m_pitch) * sin(m_yaw)
+	};
+	glm::mat4 view = glm::lookAt(m_position, m_position + glm::normalize(front), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 inv_vp = glm::inverse(projection * view);
+
+	// NDC空间
+	float ndc_x = 2.0f * screen_x - 1.0f;
+	float ndc_y = 1.0f - 2.0f * screen_y; // 注意y向下
+
+	glm::vec4 near_point = glm::vec4(ndc_x, ndc_y, -1.0f, 1.0f);
+	glm::vec4 far_point  = glm::vec4(ndc_x, ndc_y,  1.0f, 1.0f);
+
+	glm::vec4 world_near = inv_vp * near_point;
+	world_near /= world_near.w;
+	glm::vec4 world_far = inv_vp * far_point;
+	world_far /= world_far.w;
+
+	glm::vec3 ray_dir = glm::normalize(glm::vec3(world_far - world_near));
+	return ray_dir;
+}

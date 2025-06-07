@@ -63,6 +63,9 @@ public:
 	                                uint32_t src_queue_family, uint32_t dst_queue_family,
 	                                VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 	                                VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT) const;
+
+	// 新增：体素区域销毁（球形/立方体）
+	void RemoveVoxelsRegion(const glm::vec3 &center, float radius);
 };
 
 #endif
