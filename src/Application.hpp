@@ -44,37 +44,30 @@
 
 class Application {
 private:
-	GLFWwindow *m_window{nullptr};
-
-	// base
+	GLFWwindow *m_window = nullptr;
 	std::shared_ptr<myvk::Instance> m_instance;
 	std::shared_ptr<myvk::Surface> m_surface;
 	std::shared_ptr<myvk::Device> m_device;
-	std::shared_ptr<myvk::Queue> m_main_queue, m_loader_queue, m_path_tracer_queue;
-	std::shared_ptr<myvk::PresentQueue> m_present_queue;
+	std::shared_ptr<myvk::Queue> m_main_queue, m_present_queue, m_loader_queue, m_path_tracer_queue;
 	std::shared_ptr<myvk::CommandPool> m_main_command_pool, m_path_tracer_command_pool;
-
-	// frame objects
-	myvk::Ptr<myvk::FrameManager> m_frame_manager;
+	std::shared_ptr<myvk::FrameManager> m_frame_manager;
 	std::vector<std::shared_ptr<myvk::Framebuffer>> m_framebuffers;
-
-	// render pass
 	std::shared_ptr<myvk::RenderPass> m_render_pass;
+	std::shared_ptr<myvk::ImGuiRenderer> m_imgui_renderer;
 
-	myvk::Ptr<myvk::ImGuiRenderer> m_imgui_renderer;
-
-	// global resources
 	std::shared_ptr<Camera> m_camera;
+	std::shared_ptr<Lighting> m_lighting;
+	std::shared_ptr<EnvironmentMap> m_environment_map;
+
 	std::shared_ptr<Octree> m_octree;
 	std::shared_ptr<OctreeTracer> m_octree_tracer;
 	std::shared_ptr<PathTracer> m_path_tracer;
 	std::shared_ptr<PathTracerViewer> m_path_tracer_viewer;
-	std::shared_ptr<EnvironmentMap> m_environment_map;
-	std::shared_ptr<Lighting> m_lighting;
 
-	// multithreading loader
 	std::shared_ptr<LoaderThread> m_loader_thread;
 	std::shared_ptr<PathTracerThread> m_path_tracer_thread;
+
+	std::shared_ptr<OctreeBuilder> m_octree_builder; // 新增体素构建器
 
 	// ui flags
 	enum class UIStates { kEmpty, kOctreeTracer, kPathTracing, kLoading } m_ui_state{UIStates::kEmpty};

@@ -441,10 +441,8 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 		// 更新计数
 		m_voxelizer_ptr->SetVoxelFragmentCount(uint32_t(new_fragments.size() / 2));
 
-		// 标记需要重建octree
-		// 建议在主程序逻辑里收到破坏请求后，主动调用octree rebuild（如标记dirty flag），
-		// 或者在这里发出信号/回调，由你决定
-		spdlog::info("You should now trigger octree rebuild with the updated voxel data.");
+		// 标记需要重建octree（主循环检测此标志并重建）
+		m_need_rebuild_octree = true;
 	} else {
 		spdlog::info("Voxel destruction: no voxels removed at ({},{},{})", center.x, center.y, center.z);
 	}

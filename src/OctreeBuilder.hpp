@@ -67,6 +67,11 @@ public:
 
 	// 删除中心为center, 半径为radius的所有体素
 	void RemoveVoxelsRegion(const glm::vec3 &center, float radius);
+
+	// 标志：是否需要重建octree
+	bool m_need_rebuild_octree = false;
+	bool NeedRebuildOctree() const { return m_need_rebuild_octree; }
+	void ClearRebuildFlag() { m_need_rebuild_octree = false; }
 };
 
 #endif

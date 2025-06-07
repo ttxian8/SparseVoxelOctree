@@ -330,6 +330,10 @@ Application::Application() {
 	m_path_tracer = PathTracer::Create(m_octree, m_camera, m_lighting, m_path_tracer_command_pool);
 	m_path_tracer_viewer = PathTracerViewer::Create(m_path_tracer, m_render_pass, 0);
 
+	// 创建OctreeBuilder，假设用octree_tracer的voxelizer和command_pool（实际请根据你的工程调整）
+	if (m_octree_tracer && m_main_command_pool)
+		m_octree_builder = OctreeBuilder::Create(m_octree_tracer->GetVoxelizerPtr(), m_main_command_pool);
+
 	m_loader_thread = LoaderThread::Create(m_octree, m_loader_queue, m_main_queue);
 	m_path_tracer_thread = PathTracerThread::Create(m_path_tracer_viewer, m_path_tracer_queue, m_main_queue);
 }
@@ -388,6 +392,17 @@ void Application::Run() {
 					// m_octree->Update(...); // 如有必要，带上builder等参数
 				}
 			}
+		}
+
+		// --- 检查octree重建标志 ---
+		if (m_octree_builder && m_octree_builder->NeedRebuildOctree()) {
+			// 假设有一个 Octree::Update(command_pool, builder) 方法
+			// 若你的接口不同，请据实际情况修改
+			if (m_main_command_pool && m_octree_builder) {
+				m_octree->Update(m_main_command_pool, m_octree_builder);
+				spdlog::info("Octree rebuilt after voxel destruction.");
+			}
+			m_octree_builder->ClearRebuildFlag();
 		}
 
 		ui_switch_state();
