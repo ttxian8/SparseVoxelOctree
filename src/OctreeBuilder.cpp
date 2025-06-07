@@ -1,9 +1,11 @@
 #include "OctreeBuilder.hpp"
 #include "Config.hpp"
+#include "Voxelizer.hpp"
 #include <glm/glm.hpp>
 #include <spdlog/spdlog.h>
 #include <vector>
 #include <mutex>
+#include <cstring>
 
 inline static constexpr uint32_t group_x_64(uint32_t x) { return (x >> 6u) + ((x & 0x3fu) ? 1u : 0u); }
 
@@ -381,19 +383,11 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 	auto voxel_buffer = m_voxelizer_ptr->GetVoxelFragmentList();
 	if (!voxel_buffer) return;
 
-	// 假设每个体素片段记录为 uint32_t[2]，第一个为packed坐标，第二个为颜色或属性等（你可根据实际调整）
 	uint32_t voxel_count = m_voxelizer_ptr->GetVoxelFragmentCount();
 	if (voxel_count == 0) return;
-	
-	// 读取现有体素数据到CPU
-	std::vector<uint32_t> temp_fragments(voxel_count * 2);
-	voxel_buffer->DownloadData(temp_fragments.data(), 0, temp_fragments.size() * sizeof(uint32_t));
 
 	// 体素坐标解包函数
 	auto unpack_voxel_coord = [res](uint32_t packed) -> glm::ivec3 {
-		// 约定：x = (packed >>  0) & 0x3FF
-		//      y = (packed >> 10) & 0x3FF
-		//      z = (packed >> 20) & 0x3FF
 		return glm::ivec3(
 			int((packed >>  0) & 0x3FF),
 			int((packed >> 10) & 0x3FF),
@@ -401,9 +395,18 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 		);
 	};
 	auto voxel_to_world = [res](const glm::ivec3& v) -> glm::vec3 {
-		// 体素坐标转世界坐标，假设范围[0, res)
 		return glm::vec3(v) / float(res);
 	};
+
+	// 读取现有体素数据到CPU
+	std::vector<uint32_t> temp_fragments(voxel_count * 2);
+	void* mapped = voxel_buffer->Map();
+	if (!mapped) {
+		spdlog::error("Voxel buffer map failed!");
+		return;
+	}
+	std::memcpy(temp_fragments.data(), mapped, temp_fragments.size() * sizeof(uint32_t));
+	voxel_buffer->Unmap();
 
 	// 新建输出体素表
 	std::vector<uint32_t> new_fragments;
@@ -416,7 +419,6 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 		glm::vec3 world_pos = voxel_to_world(vox);
 
 		if (glm::distance(world_pos, center) >= radius) {
-			// 保留
 			new_fragments.push_back(temp_fragments[i * 2]);
 			new_fragments.push_back(temp_fragments[i * 2 + 1]);
 		} else {
@@ -424,22 +426,25 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 		}
 	}
 
-	// 若有体素被移除，则更新缓冲区和计数
 	if (removed > 0) {
 		spdlog::info("Voxel destruction: removed {} voxels at ({},{},{}) radius {}", removed, center.x, center.y, center.z, radius);
-		// 上传新体素数据到GPU
-		voxel_buffer->UpdateData(new_fragments.data(), 0, new_fragments.size() * sizeof(uint32_t));
-		// 更新计数（通过接口）
+
+		// 更新缓冲区
+		void* map_update = voxel_buffer->Map();
+		if (map_update) {
+			std::memcpy(map_update, new_fragments.data(), new_fragments.size() * sizeof(uint32_t));
+			voxel_buffer->Unmap();
+		} else {
+			spdlog::error("Voxel buffer map for update failed!");
+		}
+
+		// 更新计数
 		m_voxelizer_ptr->SetVoxelFragmentCount(uint32_t(new_fragments.size() / 2));
 
-		// 重新构建八叉树和相关结构
-		// 这里假设有命令池可用，你可能需要传递相关参数或异步处理
-		if (m_voxelizer_ptr->GetScenePtr() && m_voxelizer_ptr->GetScenePtr()->GetCommandPoolPtr()) {
-			auto cmd_pool = m_voxelizer_ptr->GetScenePtr()->GetCommandPoolPtr();
-			this->Update(cmd_pool, shared_from_this());
-		} else {
-			spdlog::warn("Voxel destruction: No valid command pool for octree update!");
-		}
+		// 标记需要重建octree
+		// 建议在主程序逻辑里收到破坏请求后，主动调用octree rebuild（如标记dirty flag），
+		// 或者在这里发出信号/回调，由你决定
+		spdlog::info("You should now trigger octree rebuild with the updated voxel data.");
 	} else {
 		spdlog::info("Voxel destruction: no voxels removed at ({},{},{})", center.x, center.y, center.z);
 	}
