@@ -56,7 +56,7 @@ private:
 	std::shared_ptr<myvk::RenderPass> m_render_pass;
 	std::shared_ptr<myvk::ImGuiRenderer> m_imgui_renderer;
 
-	std::shared_ptr<Voxelizer> m_voxelizer; // 新增：体素化器
+	// std::shared_ptr<Voxelizer> m_voxelizer; // 不再单独持有体素化器，仅通过 m_octree_builder 获取
 
 	std::shared_ptr<Camera> m_camera;
 	std::shared_ptr<Lighting> m_lighting;

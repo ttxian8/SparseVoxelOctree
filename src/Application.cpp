@@ -351,20 +351,8 @@ Application::~Application() {
 }
 
 void Application::Load(const char *filename, uint32_t octree_level) {
-	// 1. 构建场景对象
-	auto scene = std::make_shared<Scene>();
-	// ... 你需要根据你的项目实际初始化 scene（加载模型、资源等）...
-
-	// 2. 创建体素化器
-	m_voxelizer = Voxelizer::Create(scene, m_main_command_pool, octree_level);
-
-	// 3. 创建 OctreeBuilder
-	if (m_voxelizer && m_main_command_pool)
-		m_octree_builder = OctreeBuilder::Create(m_voxelizer, m_main_command_pool);
-	else
-		m_octree_builder = nullptr;
-
-	// 4. 启动异步加载线程（如果你项目还需要）
+	// 只需启动异步加载线程，OctreeBuilder 会在 TryJoin 后自动赋值
+	m_octree_builder = nullptr; // 每次载入前清空
 	m_loader_thread->Launch(filename, octree_level);
 }
 
@@ -375,47 +363,39 @@ void Application::Run() {
 
 		glfwPollEvents();
 
-		// --- 新增：左键体素破坏逻辑 ---
+		// --- 新增：左键体素破坏逻辑（只触发一次） ---
+		static bool mouse_last_pressed = false;
+		bool mouse_now_pressed = (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+
 		if (m_ui_state == UIStates::kOctreeTracer) {
 			m_camera->Control(m_window, float(cur_time - lst_time));
 
-			// 检查左键（GLFW_MOUSE_BUTTON_LEFT）是否按下
-			if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-				spdlog::info("Left mouse pressed");
-                // 获取鼠标位置（像素）
+			if (mouse_now_pressed && !mouse_last_pressed) { // 只在按下瞬间触发
+				spdlog::info("Left mouse pressed (edge)");
 				double xpos, ypos;
 				glfwGetCursorPos(m_window, &xpos, &ypos);
 				int win_w, win_h;
 				glfwGetWindowSize(m_window, &win_w, &win_h);
 
-				// 转归一化屏幕坐标
 				float sx = float(xpos) / float(win_w);
 				float sy = float(ypos) / float(win_h);
 
-				// 获取射线
 				glm::vec3 ray_dir = m_camera->ScreenRay(sx, sy);
 				glm::vec3 cam_pos = m_camera->m_position;
 
-				// 这里需有体素拾取/射线-体素相交算法，找到第一个被射中的体素位置（可优化为SVO加速）
-				// 伪代码如下（具体实现需结合SVO结构优化）：
-				glm::vec3 hit_voxel_world = cam_pos + ray_dir * 5.0f; // 这里5.0f应为场景深度的最大值，实际应遍历体素/八叉树
+				glm::vec3 hit_voxel_world = cam_pos + ray_dir * 5.0f;
 
-				// 调用OctreeBuilder体素删除
 				if (m_octree_builder) {
-                    spdlog::info("octree_builder valid");
-					float destroy_radius = 0.2f; // 破坏半径，按需调整
-                    spdlog::info("Calling RemoveVoxelsRegion...");
+					spdlog::info("octree_builder valid");
+					float destroy_radius = 0.2f;
+					spdlog::info("Calling RemoveVoxelsRegion...");
 					m_octree_builder->RemoveVoxelsRegion(hit_voxel_world, destroy_radius);
-
-					// 更新八叉树
-					// m_octree->Update(...); // 如有必要，带上builder等参数
+				} else {
+					spdlog::warn("octree_builder is null!");
 				}
-                else
-                {
-                    spdlog::warn("octree_builder is null!");
-                }
 			}
 		}
+		mouse_last_pressed = mouse_now_pressed;
 
 		// --- 检查octree重建标志 ---
 		if (m_octree_builder && m_octree_builder->NeedRebuildOctree()) {
@@ -448,6 +428,11 @@ void Application::ui_switch_state() {
 		m_ui_state = UIStates::kLoading;
 
 		if (m_loader_thread->TryJoin()) {
+			// loader线程完成，获取OctreeBuilder用于体素破坏
+			m_octree_builder = nullptr;
+			auto builder = m_loader_thread->GetFuture().valid() ? m_loader_thread->GetFuture().get() : nullptr;
+			if (builder)
+				m_octree_builder = builder;
 			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
 		}
 	} else if (m_octree->Empty())
