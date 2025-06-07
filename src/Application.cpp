@@ -351,8 +351,8 @@ Application::~Application() {
 }
 
 void Application::Load(const char *filename, uint32_t octree_level) {
-	// 只需启动异步加载线程，OctreeBuilder 会在 TryJoin 后自动赋值
-	m_octree_builder = nullptr; // 每次载入前清空
+	m_octree_builder = nullptr;
+	m_octree_builder_ready = false; // 重置标志，下次 TryJoin 后可提取
 	m_loader_thread->Launch(filename, octree_level);
 }
 
@@ -427,12 +427,22 @@ void Application::ui_switch_state() {
 	} else if (m_loader_thread->IsRunning()) {
 		m_ui_state = UIStates::kLoading;
 
-		if (m_loader_thread->TryJoin()) {
-			// loader线程完成，获取OctreeBuilder用于体素破坏
+		if (m_loader_thread->TryJoin() && !m_octree_builder_ready) {
+			// 只在第一次TryJoin后提取builder
 			m_octree_builder = nullptr;
-			auto builder = m_loader_thread->GetFuture().valid() ? m_loader_thread->GetFuture().get() : nullptr;
-			if (builder)
-				m_octree_builder = builder;
+			auto& future = m_loader_thread->GetFuture();
+			if (future.valid()) {
+				try {
+					m_octree_builder = future.get();
+					spdlog::info("m_octree_builder set from loader thread");
+				} catch (const std::exception& e) {
+					spdlog::error("Failed to get OctreeBuilder from loader thread: {}", e.what());
+				}
+			}
+			m_octree_builder_ready = true;
+			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
+		} else if (m_loader_thread->TryJoin()) {
+			// 已经提取过builder，不重复提取
 			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
 		}
 	} else if (m_octree->Empty())

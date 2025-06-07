@@ -44,6 +44,10 @@
 
 class Application {
 private:
+	// ...
+	std::shared_ptr<OctreeBuilder> m_octree_builder;
+	bool m_octree_builder_ready = false; // 新增：仅提取一次builder
+private:
 	GLFWwindow *m_window = nullptr;
 	std::shared_ptr<myvk::Instance> m_instance;
 	std::shared_ptr<myvk::Surface> m_surface;
