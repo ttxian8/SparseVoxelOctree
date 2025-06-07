@@ -266,7 +266,7 @@ void Application::initialize_vulkan() {
 
 			return {
 			    myvk::QueueSelection{&m_main_queue, main_queue_family.value(), 0u},
-			    myvk::QueueSelection{m_surface, &m_present_queue, present_queue_family.value(), 0u},
+			    myvk::QueueSelection{m_surface, &m_present_queue, present_queue_family.value(), 0u}, // m_present_queue类型应为PresentQueue*
 			    myvk::QueueSelection{&m_loader_queue, loader_queue_family.value(), 1u},
 			    myvk::QueueSelection{&m_path_tracer_queue, path_tracer_queue_family.value(), 1u},
 			};
@@ -325,6 +325,10 @@ Application::Application() {
 
 	m_camera = Camera::Create(m_device, kFrameCount + 1); // reserve a camera buffer for path tracer
 	m_camera->m_position = glm::vec3(1.5);
+
+	// 注意：此处 m_voxelizer 和 m_octree_builder 的创建应移到 Load()
+	// 这里无需再初始化 m_voxelizer 和 m_octree_builder
+
 	m_octree = Octree::Create(m_device);
 	m_octree_tracer = OctreeTracer::Create(m_octree, m_camera, m_lighting, m_render_pass, 0, kFrameCount);
 	m_path_tracer = PathTracer::Create(m_octree, m_camera, m_lighting, m_path_tracer_command_pool);
@@ -346,7 +350,15 @@ Application::~Application() {
 	glfwTerminate();
 }
 
-void Application::Load(const char *filename, uint32_t octree_level) { m_loader_thread->Launch(filename, octree_level); }
+void Application::Load(const char *filename, uint32_t octree_level) {
+	m_octree_builder = nullptr;
+	m_octree_builder_ready = false; // 重置标志
+	spdlog::info("Load() called, builder ready flag reset, launching loader thread...");
+	if (m_loader_thread)
+		m_loader_thread->Launch(filename, octree_level);
+	else
+		spdlog::warn("Load() called but m_loader_thread is null!");
+}
 
 void Application::Run() {
 	double lst_time = glfwGetTime();
@@ -355,8 +367,50 @@ void Application::Run() {
 
 		glfwPollEvents();
 
-		if (m_ui_state == UIStates::kOctreeTracer)
+		// --- 新增：左键体素破坏逻辑（只触发一次） ---
+		static bool mouse_last_pressed = false;
+		bool mouse_now_pressed = (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+
+		if (m_ui_state == UIStates::kOctreeTracer) {
 			m_camera->Control(m_window, float(cur_time - lst_time));
+
+			if (mouse_now_pressed && !mouse_last_pressed) { // 只在按下瞬间触发
+				spdlog::info("Left mouse pressed (edge)");
+				double xpos, ypos;
+				glfwGetCursorPos(m_window, &xpos, &ypos);
+				int win_w, win_h;
+				glfwGetWindowSize(m_window, &win_w, &win_h);
+
+				float sx = float(xpos) / float(win_w);
+				float sy = float(ypos) / float(win_h);
+
+				glm::vec3 ray_dir = m_camera->ScreenRay(sx, sy);
+				glm::vec3 cam_pos = m_camera->m_position;
+
+				glm::vec3 hit_voxel_world = cam_pos + ray_dir * 5.0f;
+
+				if (m_octree_builder) {
+					spdlog::info("octree_builder valid");
+					float destroy_radius = 0.2f;
+					spdlog::info("Calling RemoveVoxelsRegion...");
+					m_octree_builder->RemoveVoxelsRegion(hit_voxel_world, destroy_radius);
+				} else {
+					spdlog::warn("octree_builder is null!");
+				}
+			}
+		}
+		mouse_last_pressed = mouse_now_pressed;
+
+		// --- 检查octree重建标志 ---
+		if (m_octree_builder && m_octree_builder->NeedRebuildOctree()) {
+			// 假设有一个 Octree::Update(command_pool, builder) 方法
+			// 若你的接口不同，请据实际情况修改
+			if (m_main_command_pool && m_octree_builder) {
+				m_octree->Update(m_main_command_pool, m_octree_builder);
+				spdlog::info("Octree rebuilt after voxel destruction.");
+			}
+			m_octree_builder->ClearRebuildFlag();
+		}
 
 		ui_switch_state();
 
@@ -372,15 +426,28 @@ void Application::Run() {
 }
 
 void Application::ui_switch_state() {
-	if (m_path_tracer_thread->IsRunning()) {
+	if (m_path_tracer_thread && m_path_tracer_thread->IsRunning()) {
 		m_ui_state = UIStates::kPathTracing;
-	} else if (m_loader_thread->IsRunning()) {
+	} else if (m_loader_thread && m_loader_thread->IsRunning()) {
 		m_ui_state = UIStates::kLoading;
 
-		if (m_loader_thread->TryJoin()) {
-			m_ui_state = m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
+		bool just_joined = m_loader_thread->TryJoin();
+		if (just_joined && !m_octree_builder_ready) {
+			// 只在第一次TryJoin后提取builder，从 loader thread 成员获取
+			m_octree_builder = nullptr;
+			std::shared_ptr<OctreeBuilder> builder = m_loader_thread->GetBuiltBuilder();
+			if (builder) {
+				m_octree_builder = builder;
+				spdlog::info("[ui_switch_state] m_octree_builder SET from loader thread (from member)!");
+			} else {
+				spdlog::warn("[ui_switch_state] OctreeBuilder from loader thread is null!");
+			}
+			m_octree_builder_ready = true;
+			m_ui_state = m_octree && m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
+		} else if (just_joined) {
+			m_ui_state = m_octree && m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;
 		}
-	} else if (m_octree->Empty())
+	} else if (m_octree && m_octree->Empty())
 		m_ui_state = UIStates::kEmpty;
 	else {
 		m_ui_state = UIStates::kOctreeTracer;

@@ -5,6 +5,11 @@
 
 // 辅助函数：获取文件扩展名
 static std::string get_file_extension(const char* filename) {
+	
+// LoaderThread 获取构建好的builder
+std::shared_ptr<OctreeBuilder> LoaderThread::GetBuiltBuilder() const {
+	return m_built_builder;
+}
     if (!filename) return "";
     std::string fname(filename);
     size_t dot_pos = fname.find_last_of('.');
@@ -45,8 +50,10 @@ bool LoaderThread::TryJoin() {
 
 	m_thread.join();
 
+	m_built_builder = nullptr;
 	std::shared_ptr<OctreeBuilder> builder = m_future.get();
 	if (builder) {
+		m_built_builder = builder; // 缓存builder供主线程使用
 		std::shared_ptr<myvk::CommandPool> loader_command_pool = myvk::CommandPool::Create(m_loader_queue);
 		m_main_queue->WaitIdle();
 		m_octree_ptr->Update(loader_command_pool, builder);

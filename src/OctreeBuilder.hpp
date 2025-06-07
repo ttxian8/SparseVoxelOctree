@@ -10,6 +10,7 @@
 #include "myvk/DescriptorSet.hpp"
 #include "myvk/Framebuffer.hpp"
 #include "myvk/RenderPass.hpp"
+#include <glm/glm.hpp>
 
 class OctreeBuilder {
 private:
@@ -63,6 +64,14 @@ public:
 	                                uint32_t src_queue_family, uint32_t dst_queue_family,
 	                                VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 	                                VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT) const;
+
+	// 删除中心为center, 半径为radius的所有体素
+	void RemoveVoxelsRegion(const glm::vec3 &center, float radius);
+
+	// 标志：是否需要重建octree
+	bool m_need_rebuild_octree = false;
+	bool NeedRebuildOctree() const { return m_need_rebuild_octree; }
+	void ClearRebuildFlag() { m_need_rebuild_octree = false; }
 };
 
 #endif

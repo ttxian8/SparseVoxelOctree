@@ -1,7 +1,11 @@
 #include "OctreeBuilder.hpp"
 #include "Config.hpp"
-
+#include "Voxelizer.hpp"
+#include <glm/glm.hpp>
 #include <spdlog/spdlog.h>
+#include <vector>
+#include <mutex>
+#include <cstring>
 
 inline static constexpr uint32_t group_x_64(uint32_t x) { return (x >> 6u) + ((x & 0x3fu) ? 1u : 0u); }
 
@@ -367,4 +371,80 @@ void OctreeBuilder::CmdTransferOctreeOwnership(const std::shared_ptr<myvk::Comma
                                                VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage) const {
 	command_buffer->CmdPipelineBarrier(
 	    src_stage, dst_stage, {}, {m_octree_buffer->GetMemoryBarrier(0, 0, src_queue_family, dst_queue_family)}, {});
+}
+
+// 新增：体素区域销毁（球形，实际实现需遍历voxel数据）
+// 这里只提供伪实现，你需针对自身体素数据结构优化！
+// 可用多线程或并行处理大范围操作
+void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
+	spdlog::info("RemoveVoxelsRegion called: center=({}, {}, {}), radius={}", center.x, center.y, center.z, radius);
+    // 体素分辨率
+	if (!m_voxelizer_ptr) return;
+	uint32_t res = m_voxelizer_ptr->GetVoxelResolution();
+	auto voxel_buffer = m_voxelizer_ptr->GetVoxelFragmentList();
+	if (!voxel_buffer) return;
+
+	uint32_t voxel_count = m_voxelizer_ptr->GetVoxelFragmentCount();
+	if (voxel_count == 0) return;
+
+	// 体素坐标解包函数
+	auto unpack_voxel_coord = [res](uint32_t packed) -> glm::ivec3 {
+		return glm::ivec3(
+			int((packed >>  0) & 0x3FF),
+			int((packed >> 10) & 0x3FF),
+			int((packed >> 20) & 0x3FF)
+		);
+	};
+	auto voxel_to_world = [res](const glm::ivec3& v) -> glm::vec3 {
+		return glm::vec3(v) / float(res);
+	};
+
+	// 读取现有体素数据到CPU
+	std::vector<uint32_t> temp_fragments(voxel_count * 2);
+	void* mapped = voxel_buffer->Map();
+	if (!mapped) {
+		spdlog::error("Voxel buffer map failed!");
+		return;
+	}
+	std::memcpy(temp_fragments.data(), mapped, temp_fragments.size() * sizeof(uint32_t));
+	voxel_buffer->Unmap();
+
+	// 新建输出体素表
+	std::vector<uint32_t> new_fragments;
+	new_fragments.reserve(temp_fragments.size());
+
+	uint32_t removed = 0;
+	for (uint32_t i = 0; i < voxel_count; ++i) {
+		uint32_t packed = temp_fragments[i * 2];
+		glm::ivec3 vox = unpack_voxel_coord(packed);
+		glm::vec3 world_pos = voxel_to_world(vox);
+
+		if (glm::distance(world_pos, center) >= radius) {
+			new_fragments.push_back(temp_fragments[i * 2]);
+			new_fragments.push_back(temp_fragments[i * 2 + 1]);
+		} else {
+			++removed;
+		}
+	}
+
+	if (removed > 0) {
+		spdlog::info("Voxel destruction: removed {} voxels at ({},{},{}) radius {}", removed, center.x, center.y, center.z, radius);
+
+		// 更新缓冲区
+		void* map_update = voxel_buffer->Map();
+		if (map_update) {
+			std::memcpy(map_update, new_fragments.data(), new_fragments.size() * sizeof(uint32_t));
+			voxel_buffer->Unmap();
+		} else {
+			spdlog::error("Voxel buffer map for update failed!");
+		}
+
+		// 更新计数
+		m_voxelizer_ptr->SetVoxelFragmentCount(uint32_t(new_fragments.size() / 2));
+
+		// 标记需要重建octree（主循环检测此标志并重建）
+		m_need_rebuild_octree = true;
+	} else {
+		spdlog::info("Voxel destruction: no voxels removed at ({},{},{})", center.x, center.y, center.z);
+	}
 }
