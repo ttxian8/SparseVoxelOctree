@@ -70,7 +70,8 @@ private:
 	std::shared_ptr<LoaderThread> m_loader_thread;
 	std::shared_ptr<PathTracerThread> m_path_tracer_thread;
 
-	std::shared_ptr<OctreeBuilder> m_octree_builder; // 新增体素构建器
+    std::shared_ptr<OctreeBuilder> m_octree_builder;
+    bool m_octree_builder_ready = false;
 
 	// ui flags
 	enum class UIStates { kEmpty, kOctreeTracer, kPathTracing, kLoading } m_ui_state{UIStates::kEmpty};
