@@ -377,7 +377,8 @@ void OctreeBuilder::CmdTransferOctreeOwnership(const std::shared_ptr<myvk::Comma
 // 这里只提供伪实现，你需针对自身体素数据结构优化！
 // 可用多线程或并行处理大范围操作
 void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
-	// 体素分辨率
+	spdlog::info("RemoveVoxelsRegion called: center=({}, {}, {}), radius={}", center.x, center.y, center.z, radius);
+    // 体素分辨率
 	if (!m_voxelizer_ptr) return;
 	uint32_t res = m_voxelizer_ptr->GetVoxelResolution();
 	auto voxel_buffer = m_voxelizer_ptr->GetVoxelFragmentList();

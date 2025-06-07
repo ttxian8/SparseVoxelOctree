@@ -326,18 +326,13 @@ Application::Application() {
 	m_camera = Camera::Create(m_device, kFrameCount + 1); // reserve a camera buffer for path tracer
 	m_camera->m_position = glm::vec3(1.5);
 
-	// 你需要在此处或加载场景后初始化 m_voxelizer
-	// 比如：m_voxelizer = Voxelizer::Create(...); 具体参数请参照你的工程
-	// 示例：m_voxelizer = Voxelizer::Create(scene, m_main_command_pool, octree_level);
+	// 注意：此处 m_voxelizer 和 m_octree_builder 的创建应移到 Load()
+	// 这里无需再初始化 m_voxelizer 和 m_octree_builder
 
 	m_octree = Octree::Create(m_device);
 	m_octree_tracer = OctreeTracer::Create(m_octree, m_camera, m_lighting, m_render_pass, 0, kFrameCount);
 	m_path_tracer = PathTracer::Create(m_octree, m_camera, m_lighting, m_path_tracer_command_pool);
 	m_path_tracer_viewer = PathTracerViewer::Create(m_path_tracer, m_render_pass, 0);
-
-	// 用 m_voxelizer 创建 OctreeBuilder
-	if (m_voxelizer && m_main_command_pool)
-		m_octree_builder = OctreeBuilder::Create(m_voxelizer, m_main_command_pool);
 
 	m_loader_thread = LoaderThread::Create(m_octree, m_loader_queue, m_main_queue);
 	m_path_tracer_thread = PathTracerThread::Create(m_path_tracer_viewer, m_path_tracer_queue, m_main_queue);
@@ -355,7 +350,23 @@ Application::~Application() {
 	glfwTerminate();
 }
 
-void Application::Load(const char *filename, uint32_t octree_level) { m_loader_thread->Launch(filename, octree_level); }
+void Application::Load(const char *filename, uint32_t octree_level) {
+	// 1. 构建场景对象
+	auto scene = std::make_shared<Scene>();
+	// ... 你需要根据你的项目实际初始化 scene（加载模型、资源等）...
+
+	// 2. 创建体素化器
+	m_voxelizer = Voxelizer::Create(scene, m_main_command_pool, octree_level);
+
+	// 3. 创建 OctreeBuilder
+	if (m_voxelizer && m_main_command_pool)
+		m_octree_builder = OctreeBuilder::Create(m_voxelizer, m_main_command_pool);
+	else
+		m_octree_builder = nullptr;
+
+	// 4. 启动异步加载线程（如果你项目还需要）
+	m_loader_thread->Launch(filename, octree_level);
+}
 
 void Application::Run() {
 	double lst_time = glfwGetTime();
@@ -370,7 +381,8 @@ void Application::Run() {
 
 			// 检查左键（GLFW_MOUSE_BUTTON_LEFT）是否按下
 			if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-				// 获取鼠标位置（像素）
+				spdlog::info("Left mouse pressed");
+                // 获取鼠标位置（像素）
 				double xpos, ypos;
 				glfwGetCursorPos(m_window, &xpos, &ypos);
 				int win_w, win_h;
@@ -390,12 +402,18 @@ void Application::Run() {
 
 				// 调用OctreeBuilder体素删除
 				if (m_octree_builder) {
+                    spdlog::info("octree_builder valid");
 					float destroy_radius = 0.2f; // 破坏半径，按需调整
+                    spdlog::info("Calling RemoveVoxelsRegion...");
 					m_octree_builder->RemoveVoxelsRegion(hit_voxel_world, destroy_radius);
 
 					// 更新八叉树
 					// m_octree->Update(...); // 如有必要，带上builder等参数
 				}
+                else
+                {
+                    spdlog::warn("octree_builder is null!");
+                }
 			}
 		}
 
