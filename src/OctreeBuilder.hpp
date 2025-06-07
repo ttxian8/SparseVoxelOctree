@@ -10,6 +10,7 @@
 #include "myvk/DescriptorSet.hpp"
 #include "myvk/Framebuffer.hpp"
 #include "myvk/RenderPass.hpp"
+#include <glm/glm.hpp>
 
 class OctreeBuilder {
 private:
@@ -64,7 +65,7 @@ public:
 	                                VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 	                                VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT) const;
 
-	// 新增：体素区域销毁（球形/立方体）
+	// 删除中心为center, 半径为radius的所有体素
 	void RemoveVoxelsRegion(const glm::vec3 &center, float radius);
 };
 

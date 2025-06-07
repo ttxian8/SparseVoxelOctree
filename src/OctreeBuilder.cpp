@@ -429,13 +429,16 @@ void OctreeBuilder::RemoveVoxelsRegion(const glm::vec3 &center, float radius) {
 		spdlog::info("Voxel destruction: removed {} voxels at ({},{},{}) radius {}", removed, center.x, center.y, center.z, radius);
 		// 上传新体素数据到GPU
 		voxel_buffer->UpdateData(new_fragments.data(), 0, new_fragments.size() * sizeof(uint32_t));
-		// 更新计数
-		m_voxelizer_ptr->m_voxel_fragment_count = uint32_t(new_fragments.size() / 2);
+		// 更新计数（通过接口）
+		m_voxelizer_ptr->SetVoxelFragmentCount(uint32_t(new_fragments.size() / 2));
 
 		// 重新构建八叉树和相关结构
 		// 这里假设有命令池可用，你可能需要传递相关参数或异步处理
-		if (auto cmd_pool = m_voxelizer_ptr->m_scene_ptr->GetCommandPoolPtr()) {
+		if (m_voxelizer_ptr->GetScenePtr() && m_voxelizer_ptr->GetScenePtr()->GetCommandPoolPtr()) {
+			auto cmd_pool = m_voxelizer_ptr->GetScenePtr()->GetCommandPoolPtr();
 			this->Update(cmd_pool, shared_from_this());
+		} else {
+			spdlog::warn("Voxel destruction: No valid command pool for octree update!");
 		}
 	} else {
 		spdlog::info("Voxel destruction: no voxels removed at ({},{},{})", center.x, center.y, center.z);
