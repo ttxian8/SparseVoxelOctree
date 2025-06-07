@@ -5,6 +5,11 @@
 
 // 辅助函数：获取文件扩展名
 static std::string get_file_extension(const char* filename) {
+	
+// LoaderThread 获取构建好的builder
+std::shared_ptr<OctreeBuilder> LoaderThread::GetBuiltBuilder() const {
+	return m_built_builder;
+}
     if (!filename) return "";
     std::string fname(filename);
     size_t dot_pos = fname.find_last_of('.');

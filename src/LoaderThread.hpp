@@ -24,6 +24,8 @@ private:
 
 	void thread_func(const char *filename, uint32_t octree_level);
 public:
+	// 获取构建好的builder（TryJoin后调用）
+	std::shared_ptr<OctreeBuilder> GetBuiltBuilder() const;
 	// 新增：获取future
 	std::future<std::shared_ptr<OctreeBuilder>>& GetFuture() { return m_future; }
 
