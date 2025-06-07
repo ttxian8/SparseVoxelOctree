@@ -433,23 +433,14 @@ void Application::ui_switch_state() {
 
 		bool just_joined = m_loader_thread->TryJoin();
 		if (just_joined && !m_octree_builder_ready) {
-			// 只在第一次TryJoin后提取builder
+			// 只在第一次TryJoin后提取builder，从 loader thread 成员获取
 			m_octree_builder = nullptr;
-			auto& future = m_loader_thread->GetFuture();
-			if (future.valid()) {
-				try {
-					std::shared_ptr<OctreeBuilder> builder = future.get();
-					if (builder) {
-						m_octree_builder = builder;
-						spdlog::info("[ui_switch_state] m_octree_builder SET from loader thread!");
-					} else {
-						spdlog::warn("[ui_switch_state] OctreeBuilder from loader thread is null!");
-					}
-				} catch (const std::exception& e) {
-					spdlog::error("[ui_switch_state] Failed to get OctreeBuilder from loader thread: {}", e.what());
-				}
+			std::shared_ptr<OctreeBuilder> builder = m_loader_thread->GetBuiltBuilder();
+			if (builder) {
+				m_octree_builder = builder;
+				spdlog::info("[ui_switch_state] m_octree_builder SET from loader thread (from member)!");
 			} else {
-				spdlog::warn("[ui_switch_state] LoaderThread future is not valid when trying to get OctreeBuilder!");
+				spdlog::warn("[ui_switch_state] OctreeBuilder from loader thread is null!");
 			}
 			m_octree_builder_ready = true;
 			m_ui_state = m_octree && m_octree->Empty() ? UIStates::kEmpty : UIStates::kOctreeTracer;

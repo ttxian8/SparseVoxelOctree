@@ -18,6 +18,8 @@ private:
 	std::promise<std::shared_ptr<OctreeBuilder>> m_promise;
 	std::future<std::shared_ptr<OctreeBuilder>> m_future;
 
+	std::shared_ptr<OctreeBuilder> m_built_builder; // 新增：缓存构建成功的builder
+
 	std::atomic<const char *> m_notification;
 
 	void thread_func(const char *filename, uint32_t octree_level);

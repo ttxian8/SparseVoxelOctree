@@ -45,8 +45,10 @@ bool LoaderThread::TryJoin() {
 
 	m_thread.join();
 
+	m_built_builder = nullptr;
 	std::shared_ptr<OctreeBuilder> builder = m_future.get();
 	if (builder) {
+		m_built_builder = builder; // 缓存builder供主线程使用
 		std::shared_ptr<myvk::CommandPool> loader_command_pool = myvk::CommandPool::Create(m_loader_queue);
 		m_main_queue->WaitIdle();
 		m_octree_ptr->Update(loader_command_pool, builder);
