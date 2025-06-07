@@ -266,7 +266,7 @@ void Application::initialize_vulkan() {
 
 			return {
 			    myvk::QueueSelection{&m_main_queue, main_queue_family.value(), 0u},
-			    myvk::QueueSelection{m_surface, &m_present_queue, present_queue_family.value(), 0u},
+			    myvk::QueueSelection{m_surface, &m_present_queue, present_queue_family.value(), 0u}, // m_present_queue类型应为PresentQueue*
 			    myvk::QueueSelection{&m_loader_queue, loader_queue_family.value(), 1u},
 			    myvk::QueueSelection{&m_path_tracer_queue, path_tracer_queue_family.value(), 1u},
 			};
@@ -325,14 +325,19 @@ Application::Application() {
 
 	m_camera = Camera::Create(m_device, kFrameCount + 1); // reserve a camera buffer for path tracer
 	m_camera->m_position = glm::vec3(1.5);
+
+	// 你需要在此处或加载场景后初始化 m_voxelizer
+	// 比如：m_voxelizer = Voxelizer::Create(...); 具体参数请参照你的工程
+	// 示例：m_voxelizer = Voxelizer::Create(scene, m_main_command_pool, octree_level);
+
 	m_octree = Octree::Create(m_device);
 	m_octree_tracer = OctreeTracer::Create(m_octree, m_camera, m_lighting, m_render_pass, 0, kFrameCount);
 	m_path_tracer = PathTracer::Create(m_octree, m_camera, m_lighting, m_path_tracer_command_pool);
 	m_path_tracer_viewer = PathTracerViewer::Create(m_path_tracer, m_render_pass, 0);
 
-	// 创建OctreeBuilder，假设用octree_tracer的voxelizer和command_pool（实际请根据你的工程调整）
-	if (m_octree_tracer && m_main_command_pool)
-		m_octree_builder = OctreeBuilder::Create(m_octree_tracer->GetVoxelizerPtr(), m_main_command_pool);
+	// 用 m_voxelizer 创建 OctreeBuilder
+	if (m_voxelizer && m_main_command_pool)
+		m_octree_builder = OctreeBuilder::Create(m_voxelizer, m_main_command_pool);
 
 	m_loader_thread = LoaderThread::Create(m_octree, m_loader_queue, m_main_queue);
 	m_path_tracer_thread = PathTracerThread::Create(m_path_tracer_viewer, m_path_tracer_queue, m_main_queue);

@@ -48,12 +48,15 @@ private:
 	std::shared_ptr<myvk::Instance> m_instance;
 	std::shared_ptr<myvk::Surface> m_surface;
 	std::shared_ptr<myvk::Device> m_device;
-	std::shared_ptr<myvk::Queue> m_main_queue, m_present_queue, m_loader_queue, m_path_tracer_queue;
+	std::shared_ptr<myvk::Queue> m_main_queue, m_loader_queue, m_path_tracer_queue;
+	std::shared_ptr<myvk::PresentQueue> m_present_queue; // 修正present队列类型
 	std::shared_ptr<myvk::CommandPool> m_main_command_pool, m_path_tracer_command_pool;
 	std::shared_ptr<myvk::FrameManager> m_frame_manager;
 	std::vector<std::shared_ptr<myvk::Framebuffer>> m_framebuffers;
 	std::shared_ptr<myvk::RenderPass> m_render_pass;
 	std::shared_ptr<myvk::ImGuiRenderer> m_imgui_renderer;
+
+	std::shared_ptr<Voxelizer> m_voxelizer; // 新增：体素化器
 
 	std::shared_ptr<Camera> m_camera;
 	std::shared_ptr<Lighting> m_lighting;
