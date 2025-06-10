@@ -14,9 +14,9 @@ layout(std430, set = 2, binding = 0) readonly buffer uuRayData {
 uint stack[STACK_SIZE];
 
 bool RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out vec3 o_normal) {
-    d.x = abs(d.x) > EPS ? d.x : (d.x >= 0 ? EPS : -EPS);
-    d.y = abs(d.y) > EPS ? d.y : (d.y >= 0 ? EPS : -EPS);
-    d.z = abs(d.z) > EPS ? d.z : (d.z >= 0 ? EPS : -EPS);
+    d.x = abs(d.x) >= EPS ? d.x : (d.x >= 0 ? EPS : -EPS);
+    d.y = abs(d.y) >= EPS ? d.y : (d.y >= 0 ? EPS : -EPS);
+    d.z = abs(d.z) >= EPS ? d.z : (d.z >= 0 ? EPS : -EPS);
 
     vec3 t_coef = 1.0f / -abs(d);
     vec3 t_bias = t_coef * o;
@@ -60,10 +60,37 @@ bool RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out vec3 o_n
             vec3 t_center = half_scale_exp2 * t_coef + t_corner;
 
             if ((cur & 0x40000000u) != 0) {
-                o_pos = (1.0f + scale_exp2) * pos - 1.0f;
-                uint data = cur & 0x3fffffffu;
-                o_color = vec3(float(data & 0xffu), float((data >> 8u) & 0xffu), float((data >> 16u) & 0xffu)) / 255.0f;
-                o_normal = vec3(0.0f, 1.0f, 0.0f);
+                vec3 norm, t_corner_leaf = t_coef * (pos + scale_exp2) - t_bias;
+                if (t_corner_leaf.x > t_corner_leaf.y && t_corner_leaf.x > t_corner_leaf.z)
+                    norm = vec3(-1, 0, 0);
+                else if (t_corner_leaf.y > t_corner_leaf.z)
+                    norm = vec3(0, -1, 0);
+                else
+                    norm = vec3(0, 0, -1);
+
+                if ((oct_mask & 1u) == 0u)
+                    norm.x = -norm.x;
+                if ((oct_mask & 2u) == 0u)
+                    norm.y = -norm.y;
+                if ((oct_mask & 4u) == 0u)
+                    norm.z = -norm.z;
+
+                if ((oct_mask & 1u) != 0u)
+                    pos.x = 3.0f - scale_exp2 - pos.x;
+                if ((oct_mask & 2u) != 0u)
+                    pos.y = 3.0f - scale_exp2 - pos.y;
+                if ((oct_mask & 4u) != 0u)
+                    pos.z = 3.0f - scale_exp2 - pos.z;
+
+                o_pos = clamp(o + t_min * d, pos, pos + scale_exp2);
+                if (norm.x != 0)
+                    o_pos.x = norm.x > 0 ? pos.x + scale_exp2 + EPS * 2 : pos.x - EPS;
+                if (norm.y != 0)
+                    o_pos.y = norm.y > 0 ? pos.y + scale_exp2 + EPS * 2 : pos.y - EPS;
+                if (norm.z != 0)
+                    o_pos.z = norm.z > 0 ? pos.z + scale_exp2 + EPS * 2 : pos.z - EPS;
+                o_normal = norm;
+                o_color = vec3(cur & 0xffu, (cur >> 8u) & 0xffu, (cur >> 16u) & 0xffu) * 0.00392156862745098f;
                 return true;
             }
 
@@ -72,6 +99,7 @@ bool RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out vec3 o_n
             h = tc_max;
 
             parent = cur & 0x3fffffffu;
+
             idx = 0u;
             --scale;
             scale_exp2 = half_scale_exp2;
@@ -82,42 +110,47 @@ bool RayMarchLeaf(vec3 o, vec3 d, out vec3 o_pos, out vec3 o_color, out vec3 o_n
             if (t_center.z > t_min)
                 idx ^= 4u, pos.z += scale_exp2;
 
-            cur = 0u;
-            t_max = tc_max;
-        } else {
-            ++scale;
-            pos.x -= scale_exp2;
-            pos.y -= scale_exp2;
-            pos.z -= scale_exp2;
+            cur = 0;
 
-            if ((idx & 1u) != 0u) pos.x += scale_exp2;
-            if ((idx & 2u) != 0u) pos.y += scale_exp2;
-            if ((idx & 4u) != 0u) pos.z += scale_exp2;
+            continue;
+        }
 
-            scale_exp2 *= 2.0f;
-            cur = 0u;
+        uint step_mask = 0u;
+        if (t_corner.x <= tc_max)
+            step_mask ^= 1u, pos.x -= scale_exp2;
+        if (t_corner.y <= tc_max)
+            step_mask ^= 2u, pos.y -= scale_exp2;
+        if (t_corner.z <= tc_max)
+            step_mask ^= 4u, pos.z -= scale_exp2;
 
+        t_min = tc_max;
+        idx ^= step_mask;
+
+        if ((idx & step_mask) != 0) {
+            uint differing_bits = 0;
+            if ((step_mask & 1u) != 0)
+                differing_bits |= floatBitsToUint(pos.x) ^ floatBitsToUint(pos.x + scale_exp2);
+            if ((step_mask & 2u) != 0)
+                differing_bits |= floatBitsToUint(pos.y) ^ floatBitsToUint(pos.y + scale_exp2);
+            if ((step_mask & 4u) != 0)
+                differing_bits |= floatBitsToUint(pos.z) ^ floatBitsToUint(pos.z + scale_exp2);
+            scale = findMSB(differing_bits);
             if (scale >= STACK_SIZE)
-                return false;
+                break;
+            scale_exp2 = uintBitsToFloat((scale - STACK_SIZE + 127u) << 23u);
 
             parent = stack[scale];
-            t_max = h;
 
-            uint sh = scale - STACK_SIZE + 1;
-            if ((idx & 1u) != 0u) pos.x -= exp2(sh);
-            if ((idx & 2u) != 0u) pos.y -= exp2(sh);
-            if ((idx & 4u) != 0u) pos.z -= exp2(sh);
+            uint shx = floatBitsToUint(pos.x) >> scale;
+            uint shy = floatBitsToUint(pos.y) >> scale;
+            uint shz = floatBitsToUint(pos.z) >> scale;
+            pos.x = uintBitsToFloat(shx << scale);
+            pos.y = uintBitsToFloat(shy << scale);
+            pos.z = uintBitsToFloat(shz << scale);
+            idx = (shx & 1u) | ((shy & 1u) << 1u) | ((shz & 1u) << 2u);
 
-            idx ^= 1u;
-            if ((idx & 1u) != 0u) pos.x += exp2(sh);
-            if (1.5f * t_coef.x - t_bias.x <= t_min) {
-                idx ^= 2u;
-                if ((idx & 2u) != 0u) pos.y += exp2(sh);
-                if (1.5f * t_coef.y - t_bias.y <= t_min) {
-                    idx ^= 4u;
-                    if ((idx & 4u) != 0u) pos.z += exp2(sh);
-                }
-            }
+            h = 0.0f;
+            cur = 0;
         }
     }
     return false;
@@ -129,7 +162,7 @@ void main() {
     
     if (hit) {
         uint level_dim = kVoxelResolution;
-        vec3 voxel_pos_f = (pos + 1.0) * 0.5 * float(level_dim);
+        vec3 voxel_pos_f = pos * float(level_dim);
         uvec3 voxel_pos = uvec3(clamp(voxel_pos_f, vec3(0.0), vec3(float(level_dim - 1u))));
         
         uint idx = 0u, cur = 0u;

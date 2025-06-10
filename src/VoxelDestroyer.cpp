@@ -69,16 +69,19 @@ void VoxelDestroyer::create_pipeline(const std::shared_ptr<myvk::Device> &device
 }
 
 glm::vec3 VoxelDestroyer::screen_to_world_ray(float screen_x, float screen_y) const {
+    auto trans = glm::identity<glm::mat4>();
+    trans = glm::rotate(trans, m_camera_ptr->m_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+    trans = glm::rotate(trans, m_camera_ptr->m_pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
+    float tg = glm::tan(m_camera_ptr->m_fov * 0.5f);
+    
+    glm::vec3 look = (trans * glm::vec4(0.0, 0.0, 1.0, 0.0));
+    glm::vec3 side = (trans * glm::vec4(1.0, 0.0, 0.0, 0.0));
+    look = glm::normalize(look);
+    side = glm::normalize(side) * tg * m_camera_ptr->m_aspect_ratio;
+    glm::vec3 up = glm::normalize(glm::cross(look, side)) * tg;
+    
     glm::vec2 coord = glm::vec2(screen_x / float(m_screen_width), screen_y / float(m_screen_height));
     coord = coord * 2.0f - 1.0f;
-    
-    float yaw = m_camera_ptr->m_yaw;
-    float pitch = m_camera_ptr->m_pitch;
-    
-    glm::vec3 look = glm::vec3(cos(pitch) * cos(yaw), sin(pitch), cos(pitch) * sin(yaw));
-    glm::vec3 side = glm::normalize(glm::cross(look, glm::vec3(0.0f, 1.0f, 0.0f)));
-    glm::vec3 up = glm::normalize(glm::cross(side, look));
-    
     return glm::normalize(look - side * coord.x - up * coord.y);
 }
 
@@ -114,6 +117,8 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
     command_buffer->CmdDispatch(1, 1, 1);
     
     command_buffer->CmdPipelineBarrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {},
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 
+        {},
         {m_octree_ptr->GetBuffer()->GetMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)}, {});
 }
