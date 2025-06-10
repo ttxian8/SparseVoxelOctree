@@ -164,14 +164,20 @@ void main() {
     vec3 o = uPosition.xyz;
     vec3 d = Camera_GenRay(uScreenCoords);
     
+    // Debug: Log ray generation
+    // Ray origin: o, Ray direction: d, Screen coords: uScreenCoords
+    
     vec3 pos, color, normal;
     bool hit = Octree_RayMarchLeaf(o, d, pos, color, normal);
     
     if (hit) {
+        // Debug: Ray hit at position pos with color color
         // Use the same octree traversal approach as the rendering pipeline
         uint level_dim = kVoxelResolution;
         vec3 voxel_pos_f = pos * float(level_dim);
         uvec3 voxel_pos = uvec3(clamp(voxel_pos_f, vec3(0.0), vec3(float(level_dim - 1u))));
+        
+        // Debug: Voxel position calculation - pos: pos, voxel_pos: voxel_pos, level_dim: level_dim
         
         // Navigate to the leaf node containing the voxel
         uint idx = 0u;
@@ -192,7 +198,15 @@ void main() {
         
         // At leaf level, destroy the voxel if it exists
         if ((uOctree[idx] & 0x80000000u) != 0u) {
-            atomicAnd(uOctree[idx], 0x3fffffffu);
+            // Debug: Destroying voxel at octree index idx with value uOctree[idx]
+            // Clear the existence bit (0x80000000u) while preserving other data
+            atomicAnd(uOctree[idx], 0x7fffffffu);
+            // Debug: Voxel destroyed successfully
+        } else {
+            // Debug: No voxel found at octree index idx (value: uOctree[idx])
         }
+    } else {
+        // Debug: Ray missed - no intersection found with octree
+    }
     }
 }

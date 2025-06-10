@@ -85,9 +85,9 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
         return;
     }
     
-    glm::vec2 normalized_coords = glm::vec2(cursor_x / float(m_screen_width), cursor_y / float(m_screen_height));
+    glm::vec2 normalized_coords = glm::vec2(cursor_x / float(m_screen_width), 1.0f - cursor_y / float(m_screen_height));
     
-    spdlog::info("VoxelDestroyer: Destroying voxel at cursor ({}, {}) -> normalized ({}, {})", 
+    spdlog::info("VoxelDestroyer: Destroying voxel at cursor ({}, {}) -> normalized ({}, {}) [Y-flipped]", 
                  cursor_x, cursor_y, normalized_coords.x, normalized_coords.y);
     spdlog::info("VoxelDestroyer: Screen size: {}x{}, Octree level: {}", 
                  m_screen_width, m_screen_height, m_octree_ptr->GetLevel());
@@ -111,5 +111,5 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 
         {}, {m_octree_ptr->GetBuffer()->GetMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)}, {});
     
-    spdlog::info("VoxelDestroyer: Compute shader dispatched for voxel destruction");
+    spdlog::info("VoxelDestroyer: Compute shader dispatched and pipeline barrier set for voxel destruction");
 }
