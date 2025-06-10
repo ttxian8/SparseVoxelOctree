@@ -142,14 +142,14 @@ void Application::draw_frame() {
 	command_buffer->Begin();
 
 	if (m_ui_state != UIStates::kPathTracing && !m_octree->Empty()) {
-		m_octree_tracer->CmdBeamRenderPass(command_buffer, current_frame);
-		
 		if (m_ui_state == UIStates::kOctreeTracer && m_right_mouse_pressed) {
 			int width, height;
 			glfwGetFramebufferSize(m_window, &width, &height);
 			m_voxel_destroyer->SetScreenSize(width, height);
-			m_voxel_destroyer->DestroyVoxelAtCursor(command_buffer, m_last_cursor_x, m_last_cursor_y);
+			m_voxel_destroyer->DestroyVoxelAtCursor(command_buffer, m_last_cursor_x, m_last_cursor_y, current_frame);
 		}
+		
+		m_octree_tracer->CmdBeamRenderPass(command_buffer, current_frame);
 	}
 	command_buffer->CmdBeginRenderPass(m_render_pass, m_framebuffers[image_index], {{{0.0f, 0.0f, 0.0f, 1.0f}}});
 	if (m_ui_state == UIStates::kPathTracing) {

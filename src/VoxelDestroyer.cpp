@@ -91,7 +91,7 @@ void VoxelDestroyer::HandleInput(GLFWwindow *window) {
 }
 
 void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuffer> &command_buffer,
-                                         float cursor_x, float cursor_y) {
+                                         float cursor_x, float cursor_y, uint32_t current_frame) {
     if (m_octree_ptr->Empty()) {
         return;
     }
@@ -107,13 +107,13 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
     m_ray_buffer->UpdateData(ray_data);
     
     command_buffer->CmdBindDescriptorSets({m_octree_ptr->GetDescriptorSet(),
-                                          m_camera_ptr->GetFrameDescriptorSet(0),
+                                          m_camera_ptr->GetFrameDescriptorSet(current_frame),
                                           m_descriptor_set},
                                          m_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE, {});
     command_buffer->CmdBindPipeline(m_destroy_pipeline);
     command_buffer->CmdDispatch(1, 1, 1);
     
     command_buffer->CmdPipelineBarrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {},
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {},
         {m_octree_ptr->GetBuffer()->GetMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)}, {});
 }

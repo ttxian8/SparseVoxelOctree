@@ -41,7 +41,7 @@ public:
     
     void HandleInput(GLFWwindow *window);
     void DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuffer> &command_buffer, 
-                             float cursor_x, float cursor_y);
+                             float cursor_x, float cursor_y, uint32_t current_frame);
     
     void SetScreenSize(uint32_t width, uint32_t height) {
         m_screen_width = width;
