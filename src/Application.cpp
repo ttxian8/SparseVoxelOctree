@@ -147,6 +147,7 @@ void Application::draw_frame() {
 			glfwGetFramebufferSize(m_window, &width, &height);
 			m_voxel_destroyer->SetScreenSize(width, height);
 			m_voxel_destroyer->DestroyVoxelAtCursor(command_buffer, m_last_cursor_x, m_last_cursor_y, current_frame);
+			m_octree->RefreshDescriptorSet();
 		}
 		
 		m_octree_tracer->CmdBeamRenderPass(command_buffer, current_frame);
