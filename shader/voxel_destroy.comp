@@ -168,19 +168,30 @@ void main() {
     bool hit = Octree_RayMarchLeaf(o, d, pos, color, normal);
     
     if (hit) {
+        // Use the same octree traversal approach as the rendering pipeline
         uint level_dim = kVoxelResolution;
         vec3 voxel_pos_f = pos * float(level_dim);
         uvec3 voxel_pos = uvec3(clamp(voxel_pos_f, vec3(0.0), vec3(float(level_dim - 1u))));
         
-        uint idx = 0u, cur = 0u;
-        do {
-            bvec3 cmp = greaterThanEqual(voxel_pos, uvec3(level_dim >>= 1));
-            idx = cur | uint(cmp.x) | (uint(cmp.y) << 1u) | (uint(cmp.z) << 2u);
-            cur = uOctree[idx] & 0x3fffffffu;
-            voxel_pos -= uvec3(cmp) * level_dim;
-        } while (cur != 0 && level_dim > 1u);
+        // Navigate to the leaf node containing the voxel
+        uint idx = 0u;
+        uint current_level_dim = level_dim;
         
-        if (level_dim == 1u && (uOctree[idx] & 0x80000000u) != 0u) {
+        while (current_level_dim > 1u) {
+            current_level_dim >>= 1;
+            bvec3 cmp = greaterThanEqual(voxel_pos, uvec3(current_level_dim));
+            uint child_idx = uint(cmp.x) | (uint(cmp.y) << 1u) | (uint(cmp.z) << 2u);
+            idx = (uOctree[idx] & 0x3fffffffu) + child_idx;
+            voxel_pos -= uvec3(cmp) * current_level_dim;
+            
+            // Check if this node exists
+            if ((uOctree[idx] & 0x80000000u) == 0u) {
+                return; // Node doesn't exist, nothing to destroy
+            }
+        }
+        
+        // At leaf level, destroy the voxel if it exists
+        if ((uOctree[idx] & 0x80000000u) != 0u) {
             atomicAnd(uOctree[idx], 0x3fffffffu);
         }
     }
