@@ -21,7 +21,7 @@ std::shared_ptr<VoxelDestroyer> VoxelDestroyer::Create(
 }
 
 void VoxelDestroyer::create_buffers(const std::shared_ptr<myvk::Device> &device) {
-    m_ray_buffer = myvk::Buffer::Create(device, 2 * sizeof(glm::vec3),
+    m_ray_buffer = myvk::Buffer::Create(device, sizeof(glm::vec4),
                                        VMA_ALLOCATION_CREATE_MAPPED_BIT |
                                            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -68,22 +68,7 @@ void VoxelDestroyer::create_pipeline(const std::shared_ptr<myvk::Device> &device
     m_destroy_pipeline = myvk::ComputePipeline::Create(m_pipeline_layout, voxel_destroy_shader_module, &specialization_info);
 }
 
-glm::vec3 VoxelDestroyer::screen_to_world_ray(float screen_x, float screen_y) const {
-    auto trans = glm::identity<glm::mat4>();
-    trans = glm::rotate(trans, m_camera_ptr->m_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
-    trans = glm::rotate(trans, m_camera_ptr->m_pitch, glm::vec3(-1.0f, 0.0f, 0.0f));
-    float tg = glm::tan(m_camera_ptr->m_fov * 0.5f);
-    
-    glm::vec3 look = (trans * glm::vec4(0.0, 0.0, 1.0, 0.0));
-    glm::vec3 side = (trans * glm::vec4(1.0, 0.0, 0.0, 0.0));
-    look = glm::normalize(look);
-    side = glm::normalize(side) * tg * m_camera_ptr->m_aspect_ratio;
-    glm::vec3 up = glm::normalize(glm::cross(look, side)) * tg;
-    
-    glm::vec2 coord = glm::vec2(screen_x / float(m_screen_width), screen_y / float(m_screen_height));
-    coord = coord * 2.0f - 1.0f;
-    return glm::normalize(look - side * coord.x - up * coord.y);
-}
+
 
 void VoxelDestroyer::HandleInput(GLFWwindow *window) {
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
@@ -99,13 +84,12 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
         return;
     }
     
-    glm::vec3 ray_origin = m_camera_ptr->m_position;
-    glm::vec3 ray_direction = screen_to_world_ray(cursor_x, cursor_y);
+    glm::vec2 normalized_coords = glm::vec2(cursor_x / float(m_screen_width), cursor_y / float(m_screen_height));
     
     struct RayData {
-        glm::vec3 origin;
-        glm::vec3 direction;
-    } ray_data = {ray_origin, ray_direction};
+        glm::vec2 screen_coords;
+        glm::vec2 padding;
+    } ray_data = {normalized_coords, glm::vec2(0.0f)};
     
     m_ray_buffer->UpdateData(ray_data);
     

@@ -30,7 +30,7 @@ private:
     void create_pipeline(const std::shared_ptr<myvk::Device> &device);
     void create_buffers(const std::shared_ptr<myvk::Device> &device);
     
-    glm::vec3 screen_to_world_ray(float screen_x, float screen_y) const;
+   
 
 public:
     static std::shared_ptr<VoxelDestroyer> Create(

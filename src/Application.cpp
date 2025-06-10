@@ -367,14 +367,19 @@ void Application::Run() {
 		if (m_ui_state == UIStates::kOctreeTracer) {
 			m_camera->Control(m_window, float(cur_time - lst_time));
 			
+			static bool last_right_mouse = false;
 			bool current_right_mouse = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-			if (current_right_mouse && !m_right_mouse_pressed) {
+			
+			if (current_right_mouse && !last_right_mouse) {
 				double cursor_x, cursor_y;
 				glfwGetCursorPos(m_window, &cursor_x, &cursor_y);
 				m_last_cursor_x = cursor_x;
 				m_last_cursor_y = cursor_y;
+				m_right_mouse_pressed = true;
+			} else {
+				m_right_mouse_pressed = false;
 			}
-			m_right_mouse_pressed = current_right_mouse;
+			last_right_mouse = current_right_mouse;
 		}
 
 		ui_switch_state();
