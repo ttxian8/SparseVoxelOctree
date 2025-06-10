@@ -146,8 +146,11 @@ void Application::draw_frame() {
 			int width, height;
 			glfwGetFramebufferSize(m_window, &width, &height);
 			m_voxel_destroyer->SetScreenSize(width, height);
+			spdlog::info("Application: Right mouse pressed, attempting voxel destruction at ({}, {})", 
+			             m_last_cursor_x, m_last_cursor_y);
 			m_voxel_destroyer->DestroyVoxelAtCursor(command_buffer, m_last_cursor_x, m_last_cursor_y, current_frame);
 			m_octree->RefreshDescriptorSet();
+			spdlog::info("Application: Octree descriptor set refreshed after voxel destruction");
 		}
 		
 		m_octree_tracer->CmdBeamRenderPass(command_buffer, current_frame);
