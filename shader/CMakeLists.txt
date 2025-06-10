@@ -28,6 +28,8 @@ set(SHADER_SRC
 		octree_alloc_node.comp
 		octree_modify_arg.comp
 
+		voxel_destroy.comp
+
 		octree_tracer.frag
 		octree_tracer_beam.frag
 

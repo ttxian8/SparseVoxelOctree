@@ -143,6 +143,13 @@ void Application::draw_frame() {
 
 	if (m_ui_state != UIStates::kPathTracing && !m_octree->Empty()) {
 		m_octree_tracer->CmdBeamRenderPass(command_buffer, current_frame);
+		
+		if (m_ui_state == UIStates::kOctreeTracer && m_right_mouse_pressed) {
+			int width, height;
+			glfwGetFramebufferSize(m_window, &width, &height);
+			m_voxel_destroyer->SetScreenSize(width, height);
+			m_voxel_destroyer->DestroyVoxelAtCursor(command_buffer, m_last_cursor_x, m_last_cursor_y);
+		}
 	}
 	command_buffer->CmdBeginRenderPass(m_render_pass, m_framebuffers[image_index], {{{0.0f, 0.0f, 0.0f, 1.0f}}});
 	if (m_ui_state == UIStates::kPathTracing) {
@@ -332,6 +339,8 @@ Application::Application() {
 
 	m_loader_thread = LoaderThread::Create(m_octree, m_loader_queue, m_main_queue);
 	m_path_tracer_thread = PathTracerThread::Create(m_path_tracer_viewer, m_path_tracer_queue, m_main_queue);
+	
+	m_voxel_destroyer = VoxelDestroyer::Create(m_octree, m_camera, m_device);
 }
 
 Application::~Application() {
@@ -355,8 +364,18 @@ void Application::Run() {
 
 		glfwPollEvents();
 
-		if (m_ui_state == UIStates::kOctreeTracer)
+		if (m_ui_state == UIStates::kOctreeTracer) {
 			m_camera->Control(m_window, float(cur_time - lst_time));
+			
+			bool current_right_mouse = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+			if (current_right_mouse && !m_right_mouse_pressed) {
+				double cursor_x, cursor_y;
+				glfwGetCursorPos(m_window, &cursor_x, &cursor_y);
+				m_last_cursor_x = cursor_x;
+				m_last_cursor_y = cursor_y;
+			}
+			m_right_mouse_pressed = current_right_mouse;
+		}
 
 		ui_switch_state();
 

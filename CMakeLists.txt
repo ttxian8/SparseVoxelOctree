@@ -86,6 +86,8 @@ add_executable(SparseVoxelOctree
 		src/Voxelizer.hpp
 		src/VoxDataAdapter.cpp
 		src/VoxDataAdapter.hpp
+		src/VoxelDestroyer.cpp
+		src/VoxelDestroyer.hpp
 		)
 
 find_package(Threads REQUIRED)

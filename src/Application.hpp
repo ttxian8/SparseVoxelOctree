@@ -19,6 +19,7 @@
 #include "PathTracerThread.hpp"
 #include "PathTracerViewer.hpp"
 #include "Scene.hpp"
+#include "VoxelDestroyer.hpp"
 
 #include "myvk/Buffer.hpp"
 #include "myvk/CommandBuffer.hpp"
@@ -71,6 +72,7 @@ private:
 	std::shared_ptr<PathTracerViewer> m_path_tracer_viewer;
 	std::shared_ptr<EnvironmentMap> m_environment_map;
 	std::shared_ptr<Lighting> m_lighting;
+	std::shared_ptr<VoxelDestroyer> m_voxel_destroyer;
 
 	// multithreading loader
 	std::shared_ptr<LoaderThread> m_loader_thread;
@@ -79,6 +81,10 @@ private:
 	// ui flags
 	enum class UIStates { kEmpty, kOctreeTracer, kPathTracing, kLoading } m_ui_state{UIStates::kEmpty};
 	bool m_ui_display_flag{true};
+	
+	// voxel destruction state
+	bool m_right_mouse_pressed{false};
+	double m_last_cursor_x{0.0}, m_last_cursor_y{0.0};
 
 	std::shared_ptr<spdlog::sinks::ringbuffer_sink_mt> m_log_sink;
 
