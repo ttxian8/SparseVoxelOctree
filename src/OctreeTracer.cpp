@@ -169,6 +169,9 @@ void OctreeTracer::Resize(uint32_t width, uint32_t height) {
 	uint32_t beam_width = get_beam_size(m_width), beam_height = get_beam_size(m_height);
 	if (m_frame_resources[0].m_beam_image->GetExtent().width != beam_width ||
 	    m_frame_resources[0].m_beam_image->GetExtent().height != beam_height) {
+		
+		m_frame_resources[0].m_beam_image->GetDevicePtr()->WaitIdle();
+		
 		for (auto &i : m_frame_resources) {
 			i.m_beam_image = myvk::Image::CreateTexture2D(
 			    i.m_beam_image->GetDevicePtr(), {beam_width, beam_height}, 1, VK_FORMAT_R32_SFLOAT,
