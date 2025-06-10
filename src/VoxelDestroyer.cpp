@@ -105,6 +105,4 @@ void VoxelDestroyer::DestroyVoxelAtCursor(const std::shared_ptr<myvk::CommandBuf
         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 
         {},
         {m_octree_ptr->GetBuffer()->GetMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)}, {});
-    
-    m_octree_ptr->RefreshDescriptorSet();
 }
