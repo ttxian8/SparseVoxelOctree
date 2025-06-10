@@ -33,6 +33,13 @@ void Octree::Update(const std::shared_ptr<myvk::CommandPool> &command_pool,
 	}
 	m_descriptor_set->UpdateStorageBuffer(m_buffer, 0, 0, 0, actual_range);
 }
+
+void Octree::RefreshDescriptorSet() {
+	if (m_buffer && m_descriptor_set) {
+		m_descriptor_set->UpdateStorageBuffer(m_buffer, 0, 0, 0, m_range);
+	}
+}
+
 void Octree::CmdTransferOwnership(const std::shared_ptr<myvk::CommandBuffer> &command_buffer, uint32_t src_queue_family,
                                   uint32_t dst_queue_family, VkPipelineStageFlags src_stage,
                                   VkPipelineStageFlags dst_stage) const {
